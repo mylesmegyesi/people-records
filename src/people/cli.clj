@@ -2,24 +2,12 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.tools.cli :refer [parse-opts]]
-            [people.dsv-reader :as dsv])
+            [people.dsv-reader :as dsv]
+            [people.sorting :as sorting])
   (:import [java.time.format DateTimeFormatter]))
 
 (defn get-default-data-directory []
   (io/file (io/resource "data")))
-
-(def sorting-config
-  {
-   "gender" {:field :gender
-             :direction :asc
-             :sort-records identity}
-   "last-name" {:field :last-name
-                :direction :desc
-                :sort-records identity}
-   "birthdate" {:field :birthdate
-                :direction :asc
-                :sort-records identity}
-   })
 
 (defn cli-options []
   [["-d" "--directory DIR" "Directory containing DSV files"
@@ -126,7 +114,7 @@
       :else (do
               (print-records (-> options
                                  (dissoc :help)
-                                 (update :sorting #(get sorting-config %))))
+                                 (update :sorting #((keyword %) sorting/sorting-config))))
               0))))
 
 (defn -main [& args]

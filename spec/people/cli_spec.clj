@@ -2,7 +2,8 @@
   (:require [speclj.core :refer :all]
             [clojure.java.io :as io]
             [clojure.string :as string]
-            [people.cli :as cli])
+            [people.cli :as cli]
+            [people.sorting :as sorting])
   (:import [java.time LocalDate]))
 
 
@@ -40,7 +41,7 @@
             print-records (stub :print-records)
             output (with-out-str (cli/main parse-result print-records))
             expected-options {:directory (cli/get-default-data-directory)
-                              :sorting (get cli/sorting-config "gender")}]
+                              :sorting (:gender sorting/sorting-config)}]
         (should= "" output)
         (should-have-invoked :print-records)
         (should-have-invoked :print-records {:with [expected-options]})))
