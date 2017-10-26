@@ -40,3 +40,6 @@
 
 (defn read-dsvs [readables]
   (mapcat read-dsv readables))
+
+(defn read-dsvs-in-directory [directory]
+  (read-dsvs (rest (file-seq directory))))
