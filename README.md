@@ -1,4 +1,4 @@
-# People Records
+# People Records [![Build Status](https://travis-ci.org/mylesmegyesi/people-records.svg?branch=master)](https://travis-ci.org/mylesmegyesi/people-records)
 
 ## Dependencies
 
