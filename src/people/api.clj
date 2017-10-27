@@ -2,15 +2,16 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.tools.cli :refer [parse-opts]]
-            [camel-snake-kebab.core :refer [->camelCaseString]]
+            [camel-snake-kebab.core :refer [->camelCaseString ->kebab-case-keyword]]
             [cheshire.generate :refer [add-encoder]]
-            [compojure.core :refer [GET] :as compojure]
+            [compojure.core :refer [GET POST] :as compojure]
             [ring.adapter.jetty :as jetty]
-            [ring.middleware.json :refer [wrap-json-response]]
+            [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
             [ring.util.response :as resp]
             [people.dsv-reader :as dsv]
             [people.sorting :as sorting])
-  (:import [java.time.format DateTimeFormatter]))
+  (:import [java.time LocalDate]
+           [java.time.format DateTimeFormatter]))
 
 (add-encoder java.time.LocalDate
              (fn [value jsonGenerator]
@@ -20,8 +21,7 @@
   {:status 200
    :headers {"Content-Type" "application/json"}
    :body (sort-records-fn records)
-   }
-  )
+   })
 
 (defn routes
   ([records-atom]
@@ -31,6 +31,10 @@
   ([records-atom {:keys [sort-by-gender sort-by-birthdate sort-by-name]}]
     (compojure/routes
       (compojure/context "/records" []
+        (POST "/" {dsv :body}
+          (let [parsed-record (first (dsv/read-dsv dsv))]
+              (swap! records-atom conj parsed-record)
+              {:status 201 :headers {} :body nil}))
         (GET "/gender" [] (records-response @records-atom sort-by-gender))
         (GET "/birthdate" [] (records-response @records-atom sort-by-birthdate))
         (GET "/name" [] (records-response @records-atom sort-by-name))))))
@@ -40,7 +44,8 @@
 
 (defn handler [records-atom]
   (-> (compojure/routes (routes records-atom) not-found)
-    (wrap-json-response {:pretty true :key-fn ->camelCaseString})))
+      (wrap-json-response {:pretty true :key-fn ->camelCaseString})
+      (wrap-json-body {:keywords? ->kebab-case-keyword})))
 
 (defn get-default-data-directory []
   (io/file (io/resource "data")))

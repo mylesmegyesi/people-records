@@ -3,7 +3,8 @@
             [clojure.java.io :as io]
             [clojure.string :as string]
             [people.api :as api])
-  (:import [java.time LocalDate]))
+  (:import [java.time LocalDate]
+           [java.io StringReader]))
 
 (describe "people.api"
   (with-stubs)
@@ -56,7 +57,7 @@
 
 
   (context "routes"
-    (it "/records/gender"
+    (it "GET /records/gender"
       (let [records [heidi-williams enrique-mccoy]
             request {:request-method :get
                      :uri "/records/gender"}
@@ -68,7 +69,7 @@
                  (handler request))
         (should-have-invoked :sort-by-gender {:with [records] :times 1})))
 
-    (it "/records/birthdate"
+    (it "GET /records/birthdate"
       (let [records [heidi-williams enrique-mccoy]
             request {:request-method :get
                      :uri "/records/birthdate"}
@@ -80,7 +81,7 @@
                  (handler request))
         (should-have-invoked :sort-by-birthdate {:with [records] :times 1})))
 
-    (it "/records/name"
+    (it "GET /records/name"
       (let [records [heidi-williams enrique-mccoy]
             request {:request-method :get
                      :uri "/records/name"}
@@ -91,6 +92,34 @@
                   :body [heidi-williams]}
                  (handler request))
         (should-have-invoked :sort-by-name {:with [records] :times 1})))
+
+    (it "POST /records"
+      (let [request {:request-method :post
+                     :uri "/records"
+                     :body (StringReader. "Williams | Heidi | F | Blue | 1939-11-14")}
+            records-atom (atom [])
+            handler (api/routes records-atom)]
+        (should= {:status 201
+                  :headers {}
+                  :body nil}
+                 (handler request))
+        (should= [heidi-williams] @records-atom)))
+
+    (it "POST /records only accepts a single line"
+      (let [request {:request-method :post
+                     :uri "/records"
+                     :body (->> ["Williams | Heidi | F | Blue | 1939-11-14"
+                                 "McCoy | Enrique | M | Red | 1941-09-10"]
+                                (string/join \newline)
+                                (StringReader. ))}
+            records-atom (atom [])
+            handler (api/routes records-atom)]
+        (should= {:status 201
+                  :headers {}
+                  :body nil}
+                 (handler request))
+        (should= [heidi-williams] @records-atom)))
+
     )
 
   (context "integration"
@@ -116,6 +145,29 @@
                               ]
                              (string/join \newline))}
                  ((api/handler (atom records)) request))))
+
+    (it "adds a record"
+      (let [records-atom (atom [])
+            handler (api/handler records-atom)]
+        (handler {:request-method :post
+                  :headers {"content-type" "text/dsv"}
+                  :uri "/records"
+                  :body (StringReader. "Williams | Heidi | F | Blue | 1939-11-14")
+                  })
+
+        (should= {:status 200
+                  :headers {"Content-Type" "application/json"}
+                  :body (->> ["[ {"
+                              "  \"firstName\" : \"Heidi\","
+                              "  \"lastName\" : \"Williams\","
+                              "  \"gender\" : \"F\","
+                              "  \"favoriteColor\" : \"Blue\","
+                              "  \"birthdate\" : \"1939-11-14\""
+                              "} ]"
+                              ]
+                             (string/join \newline))}
+                 (handler {:request-method :get
+                           :uri "/records/gender"}))))
 
     (it "responds with 404"
       (let [request {:request-method :get
