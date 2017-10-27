@@ -1,0 +1,8 @@
+sudo: false
+language: clojure
+jdk:
+  - oraclejdk8
+
+install: lein deps
+
+script: lein with-profile test spec
