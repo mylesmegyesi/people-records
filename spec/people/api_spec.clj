@@ -1,10 +1,22 @@
 (ns people.api-spec
   (:require [speclj.core :refer :all]
             [clojure.java.io :as io]
-            [people.api :as api]))
+            [clojure.string :as string]
+            [people.api :as api])
+  (:import [java.time LocalDate]))
 
 (describe "people.api"
   (with-stubs)
+  (def heidi-williams {:first-name "Heidi"
+                       :last-name "Williams"
+                       :gender "F"
+                       :favorite-color "Blue"
+                       :birthdate (LocalDate/of 1939 11 14)})
+  (def enrique-mccoy {:first-name "Enrique"
+                      :last-name "McCoy"
+                      :gender "M"
+                      :favorite-color "Red"
+                      :birthdate (LocalDate/of 1941 9 10)})
 
   (context "main"
     (it "prints the usage summary"
@@ -40,5 +52,77 @@
                               :port 8080}]
         (should= "" output)
         (should-have-invoked :start-server {:with [expected-options]})))
+    )
+
+
+  (context "routes"
+    (it "/records/gender"
+      (let [records [heidi-williams enrique-mccoy]
+            request {:request-method :get
+                     :uri "/records/gender"}
+            sort-by-gender (stub :sort-by-gender {:return [heidi-williams]})
+            handler (api/routes (atom records) {:sort-by-gender sort-by-gender})]
+        (should= {:status 200
+                  :headers {"Content-Type" "application/json"}
+                  :body [heidi-williams]}
+                 (handler request))
+        (should-have-invoked :sort-by-gender {:with [records] :times 1})))
+
+    (it "/records/birthdate"
+      (let [records [heidi-williams enrique-mccoy]
+            request {:request-method :get
+                     :uri "/records/birthdate"}
+            sort-by-birthdate (stub :sort-by-birthdate {:return [heidi-williams]})
+            handler (api/routes (atom records) {:sort-by-birthdate sort-by-birthdate})]
+        (should= {:status 200
+                  :headers {"Content-Type" "application/json"}
+                  :body [heidi-williams]}
+                 (handler request))
+        (should-have-invoked :sort-by-birthdate {:with [records] :times 1})))
+
+    (it "/records/name"
+      (let [records [heidi-williams enrique-mccoy]
+            request {:request-method :get
+                     :uri "/records/name"}
+            sort-by-name (stub :sort-by-name {:return [heidi-williams]})
+            handler (api/routes (atom records) {:sort-by-name sort-by-name})]
+        (should= {:status 200
+                  :headers {"Content-Type" "application/json"}
+                  :body [heidi-williams]}
+                 (handler request))
+        (should-have-invoked :sort-by-name {:with [records] :times 1})))
+    )
+
+  (context "integration"
+    (it "responds with records sorted by gender"
+      (let [records [enrique-mccoy heidi-williams]
+            request {:request-method :get
+                     :uri "/records/gender"}]
+        (should= {:status 200
+                  :headers {"Content-Type" "application/json"}
+                  :body (->> ["[ {"
+                              "  \"firstName\" : \"Heidi\","
+                              "  \"lastName\" : \"Williams\","
+                              "  \"gender\" : \"F\","
+                              "  \"favoriteColor\" : \"Blue\","
+                              "  \"birthdate\" : \"1939-11-14\""
+                              "}, {"
+                              "  \"firstName\" : \"Enrique\","
+                              "  \"lastName\" : \"McCoy\","
+                              "  \"gender\" : \"M\","
+                              "  \"favoriteColor\" : \"Red\","
+                              "  \"birthdate\" : \"1941-09-10\""
+                              "} ]"
+                              ]
+                             (string/join \newline))}
+                 ((api/handler (atom records)) request))))
+
+    (it "responds with 404"
+      (let [request {:request-method :get
+                     :uri "/records/unknown"}]
+        (should= {:status 404
+                  :headers {}
+                  :body nil}
+                 ((api/handler (atom [])) request))))
     )
   )

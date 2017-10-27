@@ -2,13 +2,45 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.tools.cli :refer [parse-opts]]
+            [camel-snake-kebab.core :refer [->camelCaseString]]
+            [cheshire.generate :refer [add-encoder]]
+            [compojure.core :refer [GET] :as compojure]
             [ring.adapter.jetty :as jetty]
+            [ring.middleware.json :refer [wrap-json-response]]
             [ring.util.response :as resp]
-            [people.dsv-reader :as dsv]))
+            [people.dsv-reader :as dsv]
+            [people.sorting :as sorting])
+  (:import [java.time.format DateTimeFormatter]))
 
-(defn handler [records]
-  (fn [req]
-    (resp/not-found nil)))
+(add-encoder java.time.LocalDate
+             (fn [value jsonGenerator]
+               (.writeString jsonGenerator (.format DateTimeFormatter/ISO_LOCAL_DATE value))))
+
+(defn- records-response [records sort-records-fn]
+  {:status 200
+   :headers {"Content-Type" "application/json"}
+   :body (sort-records-fn records)
+   }
+  )
+
+(defn routes
+  ([records-atom]
+   (routes records-atom {:sort-by-gender sorting/sort-by-gender
+                         :sort-by-birthdate sorting/sort-by-birthdate
+                         :sort-by-name sorting/sort-by-last-name}))
+  ([records-atom {:keys [sort-by-gender sort-by-birthdate sort-by-name]}]
+    (compojure/routes
+      (compojure/context "/records" []
+        (GET "/gender" [] (records-response @records-atom sort-by-gender))
+        (GET "/birthdate" [] (records-response @records-atom sort-by-birthdate))
+        (GET "/name" [] (records-response @records-atom sort-by-name))))))
+
+(defn- not-found [_]
+  (resp/not-found nil))
+
+(defn handler [records-atom]
+  (-> (compojure/routes (routes records-atom) not-found)
+    (wrap-json-response {:pretty true :key-fn ->camelCaseString})))
 
 (defn get-default-data-directory []
   (io/file (io/resource "data")))
